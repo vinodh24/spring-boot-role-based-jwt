@@ -1,6 +1,9 @@
 package com.vinodh.security.jwt.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vinodh.security.jwt.exceptions.ErrorResponse;
 import com.vinodh.security.jwt.exceptions.InvalidTokenException;
+import com.vinodh.security.jwt.exceptions.JwtResponseUtil;
 import com.vinodh.security.jwt.service.IJwtService;
 import com.vinodh.security.jwt.service.IUserService;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -12,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -45,9 +49,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             userEmail = jwtService.extractUserName(jwt);
         } catch (ExpiredJwtException | MalformedJwtException | SignatureException e) {
-            throw e;
+            JwtResponseUtil.sendError(request, response, HttpStatus.UNAUTHORIZED, "Invalid JWT token");
+            return;
         } catch (Exception e) {
-            throw new RuntimeException("JWT token processing failed", e);
+            JwtResponseUtil.sendError(request, response, HttpStatus.INTERNAL_SERVER_ERROR, "JWT token processing failed");
+            return;
         }
 
         if (StringUtils.isNotEmpty(userEmail) && SecurityContextHolder.getContext().getAuthentication() == null) {

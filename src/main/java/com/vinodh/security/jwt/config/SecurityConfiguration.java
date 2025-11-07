@@ -1,10 +1,12 @@
 package com.vinodh.security.jwt.config;
 
+import com.vinodh.security.jwt.exceptions.JwtResponseUtil;
 import com.vinodh.security.jwt.model.Role;
 import com.vinodh.security.jwt.service.IUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -46,7 +48,17 @@ public class SecurityConfiguration {
                         .anyRequest().authenticated())
                 .sessionManagement(manager -> manager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .exceptionHandling(exception -> exception
+                // Handles 401 Unauthorized (invalid/missing token)
+                .authenticationEntryPoint((request, response, authException) -> {
+                    JwtResponseUtil.sendError(request, response, HttpStatus.UNAUTHORIZED, "Unauthorized or invalid token");
+                })
+                // Handles 403 Forbidden (user doesn’t have the required role)
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    JwtResponseUtil.sendError(request, response, HttpStatus.FORBIDDEN, "Access denied");
+                })
+        );
         return http.build();
     }
 
