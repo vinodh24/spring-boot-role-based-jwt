@@ -1,7 +1,11 @@
 package com.vinodh.security.jwt.config;
 
+import com.vinodh.security.jwt.exceptions.InvalidTokenException;
 import com.vinodh.security.jwt.service.IJwtService;
 import com.vinodh.security.jwt.service.IUserService;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,7 +19,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
 import java.io.IOException;
 
 @Component
@@ -38,22 +41,37 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         jwt = authHeader.substring(7);
-        userEmail = jwtService.extractUserName(jwt);
+
+        try {
+            userEmail = jwtService.extractUserName(jwt);
+        } catch (ExpiredJwtException | MalformedJwtException | SignatureException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("JWT token processing failed", e);
+        }
 
         if (StringUtils.isNotEmpty(userEmail) && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userService.userDetailsService().loadUserByUsername(userEmail);
 
-            if(jwtService.validateToken(jwt,userDetails)) {
-                SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-                UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
-                token.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                securityContext.setAuthentication(token);
-                SecurityContextHolder.setContext(securityContext);
+            boolean isValid;
+            try {
+                isValid = jwtService.validateToken(jwt, userDetails);
+            } catch (Exception ex) {
+                throw new InvalidTokenException("JWT token validation failed");
             }
+
+            if (!isValid) {
+                throw new InvalidTokenException("JWT token is invalid or expired");
+            }
+            SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+            UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(
+                    userDetails,
+                    null,
+                    userDetails.getAuthorities()
+            );
+            token.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            securityContext.setAuthentication(token);
+            SecurityContextHolder.setContext(securityContext);
         }
 
         filterChain.doFilter(request,response);

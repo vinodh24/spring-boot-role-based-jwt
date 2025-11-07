@@ -41,8 +41,8 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(request -> request
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers(SWAGGER_WHITELIST).permitAll()
-                        .requestMatchers("/api/v1/admin","/question/upload").hasAuthority(Role.ADMIN.name())
-                        .requestMatchers("/api/v1/user").hasAuthority(Role.USER.name(), Role.ADMIN.name())
+                        .requestMatchers("/api/v1/admin/**","/question/upload").hasAuthority(Role.ADMIN.name())
+                        .requestMatchers("/api/v1/user").hasAnyAuthority(Role.USER.name(), Role.ADMIN.name())
                         .anyRequest().authenticated())
                 .sessionManagement(manager -> manager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
